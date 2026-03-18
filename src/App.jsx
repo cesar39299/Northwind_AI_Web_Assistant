@@ -1,4 +1,14 @@
 ﻿import { useState } from "react";
+import {
+    BarChart,
+    Bar,
+    XAxis,
+    YAxis,
+    Tooltip,
+    CartesianGrid,
+    ResponsiveContainer,
+    Cell
+} from "recharts";
 
 function App() {
 
@@ -6,17 +16,16 @@ function App() {
     const [history, setHistory] = useState([]);
     const [loading, setLoading] = useState(false);
 
-    // ✅ agregar esto
     const API_URL = import.meta.env.VITE_API_URL;
+
+    // 🎨 Paleta de colores
+    const COLORS = ["#8884d8", "#82ca9d", "#ffc658", "#ff7f50", "#00c49f"];
 
     const askDatabase = async () => {
 
         if (!question) return;
 
         setLoading(true);
-
-        // ✅ AQUÍ
-        console.log("API:", API_URL);
 
         try {
             const response = await fetch(`${API_URL}/api/ai/ask`, {
@@ -34,7 +43,7 @@ function App() {
             const newItem = {
                 question,
                 sql: data.sql,
-                result: data.rows,   //CORRECTO
+                result: data.rows,
                 analysis: data.analysis
             };
 
@@ -73,6 +82,42 @@ function App() {
                     ))}
                 </tbody>
             </table>
+        );
+    };
+
+    // 🔹 Render gráfico automático
+    const renderChart = (data) => {
+        if (!data || data.length === 0) return null;
+
+        const keys = Object.keys(data[0]);
+
+        if (keys.length < 2) return null;
+
+        // Detectar columnas
+        const numericKey = keys.find(k => typeof data[0][k] === "number");
+        const categoryKey = keys.find(k => k !== numericKey);
+
+        if (!numericKey || !categoryKey) return null;
+
+        return (
+            <div style={{ width: "100%", height: 300, marginTop: 20 }}>
+                <ResponsiveContainer>
+                    <BarChart data={data}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey={categoryKey} />
+                        <YAxis />
+                        <Tooltip />
+                        <Bar dataKey={numericKey}>
+                            {data.map((entry, index) => (
+                                <Cell
+                                    key={`cell-${index}`}
+                                    fill={COLORS[index % COLORS.length]}
+                                />
+                            ))}
+                        </Bar>
+                    </BarChart>
+                </ResponsiveContainer>
+            </div>
         );
     };
 
@@ -133,7 +178,12 @@ function App() {
                         </pre>
 
                         <p><strong>📊 Resultados:</strong></p>
+
+                        {/* TABLA */}
                         {renderTable(item.result)}
+
+                        {/* GRÁFICO */}
+                        {renderChart(item.result)}
 
                         <p><strong>🧠 Análisis:</strong></p>
                         <p>{item.analysis}</p>
