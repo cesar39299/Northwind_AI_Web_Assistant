@@ -1,4 +1,4 @@
-﻿# 🧠 Northwind AI Web
+﻿# 🧠 Northwind AI Web Assistant
 
 ## 🚀 Overview
 
