@@ -1,4 +1,4 @@
-﻿import { useState } from "react";
+﻿import { useState, useRef } from "react";
 import {
     BarChart,
     Bar,
@@ -10,73 +10,193 @@ import {
     Cell
 } from "recharts";
 
+import * as XLSX from "xlsx";
+import { saveAs } from "file-saver";
+import html2canvas from "html2canvas";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
+
 function App() {
 
+    const [messages, setMessages] = useState([]);
     const [question, setQuestion] = useState("");
-    const [history, setHistory] = useState([]);
     const [loading, setLoading] = useState(false);
+    const [error, setError] = useState(null);
+
+    const chartRefs = useRef({});
 
     const API_URL = import.meta.env.VITE_API_URL;
 
-    // 🎨 Paleta de colores
     const COLORS = ["#8884d8", "#82ca9d", "#ffc658", "#ff7f50", "#00c49f"];
+
+    const formatValue = (value) => {
+        if (typeof value === "number") {
+            return Number.isInteger(value)
+                ? value
+                : value.toFixed(2);
+        }
+        return value;
+    };
+
+    // 🟢 EXPORT EXCEL PRO
+    const exportToExcelPro = (data) => {
+        if (!data?.length) return;
+
+        const ws = XLSX.utils.json_to_sheet(data);
+
+        const range = XLSX.utils.decode_range(ws['!ref']);
+        for (let c = range.s.c; c <= range.e.c; ++c) {
+            const cell = ws[XLSX.utils.encode_cell({ r: 0, c })];
+            if (cell) cell.s = { font: { bold: true } };
+        }
+
+        const summary = [
+            { Metric: "Rows", Value: data.length },
+            { Metric: "Generated", Value: new Date().toLocaleString() }
+        ];
+
+        const ws2 = XLSX.utils.json_to_sheet(summary);
+
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Datos");
+        XLSX.utils.book_append_sheet(wb, ws2, "Resumen");
+
+        const buffer = XLSX.write(wb, { bookType: "xlsx", type: "array" });
+
+        saveAs(new Blob([buffer]), "reporte.xlsx");
+    };
+
+    // 🟢 EXPORT IMAGE
+    const exportChartImage = async (index) => {
+        const el = chartRefs.current[index];
+        if (!el) return;
+
+        const canvas = await html2canvas(el);
+        const link = document.createElement("a");
+        link.download = "grafico.png";
+        link.href = canvas.toDataURL();
+        link.click();
+    };
+
+    // 🟢 EXPORT PDF PRO
+    const exportPDF = async (data, analysis, index) => {
+
+        const pdf = new jsPDF();
+
+        let y = 10;
+
+        // 🧠 TITULO
+        pdf.setFontSize(16);
+        pdf.text("AI Query Report", 10, y);
+        y += 10;
+
+        // 🧠 ANALISIS
+        pdf.setFontSize(12);
+        pdf.text("Analysis:", 10, y);
+        y += 7;
+
+        const splitAnalysis = pdf.splitTextToSize(analysis, 180);
+        pdf.text(splitAnalysis, 10, y);
+        y += splitAnalysis.length * 6 + 5;
+
+        // 📊 TABLA REAL (AUTOTABLE)
+        if (data && data.length > 0) {
+
+            const columns = Object.keys(data[0]);
+
+            const rows = data.map(r =>
+                columns.map(c => formatValue(r[c]))
+            );
+
+            autoTable(pdf, {
+                startY: y,
+                head: [columns],
+                body: rows,
+                styles: { fontSize: 8 }
+            });
+
+            y = pdf.lastAutoTable.finalY + 10;
+        }
+
+        // 📈 GRAFICO
+        const el = chartRefs.current[index];
+        if (el) {
+
+            const canvas = await html2canvas(el);
+            const img = canvas.toDataURL("image/png");
+
+            if (y > 200) {
+                pdf.addPage();
+                y = 10;
+            }
+
+            pdf.text("Chart:", 10, y);
+            y += 5;
+
+            pdf.addImage(img, "PNG", 10, y, 180, 80);
+        }
+
+        pdf.save("reporte.pdf");
+    };
 
     const askDatabase = async () => {
 
         if (!question) return;
 
+        const userMsg = { type: "user", text: question };
+        setMessages(prev => [...prev, userMsg]);
+
         setLoading(true);
+        setError(null);
 
         try {
             const response = await fetch(`${API_URL}/api/ai/ask`, {
                 method: "POST",
-                headers: {
-                    "Content-Type": "application/json"
-                },
-                body: JSON.stringify({
-                    question: question
-                })
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ question })
             });
+
+            if (!response.ok) {
+                const text = await response.text();
+                throw new Error(text);
+            }
 
             const data = await response.json();
 
-            const newItem = {
-                question,
+            const botMsg = {
+                type: "bot",
                 sql: data.sql,
-                result: data.rows,
+                rows: data.rows,
                 analysis: data.analysis
             };
 
-            setHistory([newItem, ...history]);
+            setMessages(prev => [...prev, botMsg]);
             setQuestion("");
 
-        } catch (error) {
-            console.error(error);
+        } catch (err) {
+            setError(err.message);
         }
 
         setLoading(false);
     };
 
-    // 🔹 Render tabla dinámica
-    const renderTable = (data) => {
-        if (!data || data.length === 0) return <p>No hay resultados</p>;
+    const TableView = ({ data }) => {
+        if (!data?.length) return <p>No hay resultados</p>;
 
-        const columns = Object.keys(data[0]);
+        const cols = Object.keys(data[0]);
 
         return (
-            <table border="1" cellPadding="8" style={{ marginTop: 10 }}>
+            <table style={{ width: "100%", marginTop: 10 }}>
                 <thead>
                     <tr>
-                        {columns.map((col) => (
-                            <th key={col}>{col}</th>
-                        ))}
+                        {cols.map(c => <th key={c}>{c}</th>)}
                     </tr>
                 </thead>
                 <tbody>
-                    {data.map((row, i) => (
+                    {data.map((r, i) => (
                         <tr key={i}>
-                            {columns.map((col) => (
-                                <td key={col}>{row[col]}</td>
+                            {cols.map(c => (
+                                <td key={c}>{formatValue(r[c])}</td>
                             ))}
                         </tr>
                     ))}
@@ -85,34 +205,30 @@ function App() {
         );
     };
 
-    // 🔹 Render gráfico automático
-    const renderChart = (data) => {
-        if (!data || data.length === 0) return null;
+    const ChartView = ({ data, index }) => {
+
+        if (!data?.length) return null;
 
         const keys = Object.keys(data[0]);
+        const numKey = keys.find(k => typeof data[0][k] === "number");
+        const catKey = keys.find(k => k !== numKey);
 
-        if (keys.length < 2) return null;
-
-        // Detectar columnas
-        const numericKey = keys.find(k => typeof data[0][k] === "number");
-        const categoryKey = keys.find(k => k !== numericKey);
-
-        if (!numericKey || !categoryKey) return null;
+        if (!numKey || !catKey) return null;
 
         return (
-            <div style={{ width: "100%", height: 300, marginTop: 20 }}>
+            <div
+                ref={el => chartRefs.current[index] = el}
+                style={{ height: 300, marginTop: 20 }}
+            >
                 <ResponsiveContainer>
                     <BarChart data={data}>
                         <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis dataKey={categoryKey} />
+                        <XAxis dataKey={catKey} />
                         <YAxis />
-                        <Tooltip />
-                        <Bar dataKey={numericKey}>
-                            {data.map((entry, index) => (
-                                <Cell
-                                    key={`cell-${index}`}
-                                    fill={COLORS[index % COLORS.length]}
-                                />
+                        <Tooltip formatter={(v) => formatValue(v)} />
+                        <Bar dataKey={numKey}>
+                            {data.map((_, i) => (
+                                <Cell key={i} fill={COLORS[i % COLORS.length]} />
                             ))}
                         </Bar>
                     </BarChart>
@@ -122,76 +238,90 @@ function App() {
     };
 
     return (
-        <div style={{ display: "flex", height: "100vh", fontFamily: "Arial" }}>
+        <div style={{ display: "flex", flexDirection: "column", height: "100vh" }}>
 
-            {/* 🔹 HISTORIAL */}
-            <div style={{
-                width: "25%",
-                borderRight: "1px solid #ccc",
-                padding: 20,
-                overflowY: "auto"
-            }}>
-                <h3>Historial</h3>
-                {history.map((item, index) => (
-                    <div key={index} style={{ marginBottom: 15 }}>
-                        <strong>🧑 {item.question}</strong>
-                    </div>
-                ))}
+            <div style={{ padding: 15, borderBottom: "1px solid #ddd" }}>
+                🧠 Northwind AI Assistant
             </div>
 
-            {/* 🔹 CHAT */}
-            <div style={{ flex: 1, padding: 20 }}>
+            <div style={{ flex: 1, overflowY: "auto", padding: 20, background: "#f5f5f5" }}>
 
-                <h1>Northwind AI Assistant</h1>
+                {messages.map((msg, i) => (
+                    <div key={i} style={{ marginBottom: 20 }}>
 
-                {/* INPUT */}
-                <div style={{ marginBottom: 20 }}>
-                    <input
-                        style={{ width: "70%", padding: 10 }}
-                        placeholder="Ej: ventas por país"
-                        value={question}
-                        onChange={(e) => setQuestion(e.target.value)}
-                    />
+                        {msg.type === "user" && (
+                            <div style={{ textAlign: "right" }}>
+                                <div style={{
+                                    background: "#007bff",
+                                    color: "white",
+                                    padding: 10,
+                                    borderRadius: 10,
+                                    display: "inline-block"
+                                }}>
+                                    {msg.text}
+                                </div>
+                            </div>
+                        )}
 
-                    <button
-                        style={{ marginLeft: 10, padding: 10 }}
-                        onClick={askDatabase}
-                    >
-                        {loading ? "Consultando..." : "Consultar"}
-                    </button>
-                </div>
+                        {msg.type === "bot" && (
+                            <div>
+                                <div style={{
+                                    background: "white",
+                                    padding: 15,
+                                    borderRadius: 10,
+                                    width: "80%"
+                                }}>
 
-                {/* RESPUESTAS */}
-                {history.map((item, index) => (
-                    <div key={index} style={{
-                        marginBottom: 30,
-                        padding: 15,
-                        border: "1px solid #ddd",
-                        borderRadius: 8
-                    }}>
+                                    <p><b>🧠 {msg.analysis}</b></p>
 
-                        <p><strong>🧑 Usuario:</strong> {item.question}</p>
+                                    <div style={{ marginBottom: 10 }}>
+                                        <button onClick={() => exportToExcelPro(msg.rows)}>Excel</button>
+                                        <button onClick={() => exportChartImage(i)}>Imagen</button>
+                                        <button onClick={() => exportPDF(msg.rows, msg.analysis, i)}>PDF</button>
+                                    </div>
 
-                        <p><strong>🤖 SQL generado:</strong></p>
-                        <pre style={{ background: "#f4f4f4", padding: 10 }}>
-                            {item.sql}
-                        </pre>
+                                    <TableView data={msg.rows} />
+                                    <ChartView data={msg.rows} index={i} />
 
-                        <p><strong>📊 Resultados:</strong></p>
+                                    <details style={{ marginTop: 10 }}>
+                                        <summary>Ver SQL</summary>
+                                        <pre style={{
+                                            textAlign: "left",
+                                            background: "#f4f4f4",
+                                            padding: 10,
+                                            overflowX: "auto",
+                                            whiteSpace: "pre-wrap"
+                                        }}>
+                                            {msg.sql}
+                                        </pre>
+                                    </details>
 
-                        {/* TABLA */}
-                        {renderTable(item.result)}
-
-                        {/* GRÁFICO */}
-                        {renderChart(item.result)}
-
-                        <p><strong>🧠 Análisis:</strong></p>
-                        <p>{item.analysis}</p>
+                                </div>
+                            </div>
+                        )}
 
                     </div>
                 ))}
 
+                {loading && <p>Consultando...</p>}
+
+                {error && (
+                    <div style={{ background: "#ffe6e6", padding: 10 }}>
+                        ❌ {error}
+                    </div>
+                )}
+
             </div>
+
+            <div style={{ display: "flex", padding: 10, borderTop: "1px solid #ddd" }}>
+                <input
+                    style={{ flex: 1 }}
+                    value={question}
+                    onChange={e => setQuestion(e.target.value)}
+                />
+                <button onClick={askDatabase}>Enviar</button>
+            </div>
+
         </div>
     );
 }
