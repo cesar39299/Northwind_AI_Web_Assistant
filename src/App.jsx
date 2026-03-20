@@ -235,7 +235,7 @@ function App() {
 
             {/* HEADER */}
             <div style={{ padding: 15, borderBottom: "1px solid #ddd" }}>
-                🧠 Northwind AI Assistant
+                🧠 Northwind AI Web Assistant
             </div>
 
             {/* CHAT */}
