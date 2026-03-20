@@ -38,7 +38,7 @@ function App() {
         return value;
     };
 
-    // 🟢 EXPORT EXCEL PRO
+    // 🟢 EXPORT EXCEL
     const exportToExcelPro = (data) => {
         if (!data?.length) return;
 
@@ -78,19 +78,16 @@ function App() {
         link.click();
     };
 
-    // 🟢 EXPORT PDF PRO
+    // 🟢 EXPORT PDF
     const exportPDF = async (data, analysis, index) => {
 
         const pdf = new jsPDF();
-
         let y = 10;
 
-        // 🧠 TITULO
         pdf.setFontSize(16);
         pdf.text("AI Query Report", 10, y);
         y += 10;
 
-        // 🧠 ANALISIS
         pdf.setFontSize(12);
         pdf.text("Analysis:", 10, y);
         y += 7;
@@ -99,11 +96,8 @@ function App() {
         pdf.text(splitAnalysis, 10, y);
         y += splitAnalysis.length * 6 + 5;
 
-        // 📊 TABLA REAL (AUTOTABLE)
         if (data && data.length > 0) {
-
             const columns = Object.keys(data[0]);
-
             const rows = data.map(r =>
                 columns.map(c => formatValue(r[c]))
             );
@@ -118,7 +112,6 @@ function App() {
             y = pdf.lastAutoTable.finalY + 10;
         }
 
-        // 📈 GRAFICO
         const el = chartRefs.current[index];
         if (el) {
 
@@ -240,12 +233,53 @@ function App() {
     return (
         <div style={{ display: "flex", flexDirection: "column", height: "100vh" }}>
 
+            {/* HEADER */}
             <div style={{ padding: 15, borderBottom: "1px solid #ddd" }}>
-                🧠 Northwind AI Web Assistant
+                🧠 Northwind AI Assistant
             </div>
 
+            {/* CHAT */}
             <div style={{ flex: 1, overflowY: "auto", padding: 20, background: "#f5f5f5" }}>
 
+                {/* SUGERENCIAS INICIALES */}
+                {messages.length === 0 && (
+                    <div style={{ textAlign: "center", marginTop: 50 }}>
+                        <p style={{ color: "#666" }}>
+                            Prueba con una de estas consultas:
+                        </p>
+
+                        <div style={{
+                            display: "flex",
+                            justifyContent: "center",
+                            gap: 10,
+                            flexWrap: "wrap",
+                            marginTop: 20
+                        }}>
+                            {[
+                                "top 5 customers",
+                                "ventas por país",
+                                "productos más vendidos",
+                                "total sales by year"
+                            ].map((q, i) => (
+                                <button
+                                    key={i}
+                                    onClick={() => setQuestion(q)}
+                                    style={{
+                                        padding: "10px 15px",
+                                        borderRadius: 20,
+                                        border: "1px solid #ddd",
+                                        background: "#f0f0f0",
+                                        cursor: "pointer"
+                                    }}
+                                >
+                                    {q}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                )}
+
+                {/* MENSAJES */}
                 {messages.map((msg, i) => (
                     <div key={i} style={{ marginBottom: 20 }}>
 
@@ -313,9 +347,11 @@ function App() {
 
             </div>
 
+            {/* INPUT */}
             <div style={{ display: "flex", padding: 10, borderTop: "1px solid #ddd" }}>
                 <input
                     style={{ flex: 1 }}
+                    placeholder="Ej: top 5 customers o ventas por país"
                     value={question}
                     onChange={e => setQuestion(e.target.value)}
                 />
