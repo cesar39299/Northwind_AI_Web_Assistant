@@ -241,7 +241,7 @@ function App() {
         <div style={{ display: "flex", flexDirection: "column", height: "100vh" }}>
 
             <div style={{ padding: 15, borderBottom: "1px solid #ddd" }}>
-                🧠 Northwind AI Assistant
+                🧠 Northwind AI Web Assistant
             </div>
 
             <div style={{ flex: 1, overflowY: "auto", padding: 20, background: "#f5f5f5" }}>
