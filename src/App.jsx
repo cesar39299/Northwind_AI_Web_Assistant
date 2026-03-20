@@ -265,10 +265,10 @@ function App() {
                             marginTop: 20
                         }}>
                             {[
-                                "top 5 customers",
-                                "ventas por país",
-                                "productos más vendidos",
-                                "total sales by year"
+                                "top 5 total ventas por categoría",
+                                "top 5 total ventas por producto",
+                                "top 5 total ventas por pais de envío",
+                                "top 5 total ventas por país de cliente"
                             ].map((q, i) => (
                                 <button
                                     key={i}
