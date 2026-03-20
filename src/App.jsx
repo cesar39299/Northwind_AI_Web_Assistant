@@ -29,11 +29,12 @@ function App() {
 
     const COLORS = ["#8884d8", "#82ca9d", "#ffc658", "#ff7f50", "#00c49f"];
 
+    // 🔧 FORMATO NUMÉRICO
     const formatValue = (value) => {
         if (typeof value === "number") {
             return Number.isInteger(value)
                 ? value
-                : value.toFixed(2);
+                : parseFloat(value.toFixed(2));
         }
         return value;
     };
@@ -43,12 +44,6 @@ function App() {
         if (!data?.length) return;
 
         const ws = XLSX.utils.json_to_sheet(data);
-
-        const range = XLSX.utils.decode_range(ws['!ref']);
-        for (let c = range.s.c; c <= range.e.c; ++c) {
-            const cell = ws[XLSX.utils.encode_cell({ r: 0, c })];
-            if (cell) cell.s = { font: { bold: true } };
-        }
 
         const summary = [
             { Metric: "Rows", Value: data.length },
@@ -114,7 +109,6 @@ function App() {
 
         const el = chartRefs.current[index];
         if (el) {
-
             const canvas = await html2canvas(el);
             const img = canvas.toDataURL("image/png");
 
@@ -179,22 +173,24 @@ function App() {
         const cols = Object.keys(data[0]);
 
         return (
-            <table style={{ width: "100%", marginTop: 10 }}>
-                <thead>
-                    <tr>
-                        {cols.map(c => <th key={c}>{c}</th>)}
-                    </tr>
-                </thead>
-                <tbody>
-                    {data.map((r, i) => (
-                        <tr key={i}>
-                            {cols.map(c => (
-                                <td key={c}>{formatValue(r[c])}</td>
-                            ))}
+            <div style={{ overflowX: "auto" }}>
+                <table style={{ width: "100%", marginTop: 10 }}>
+                    <thead>
+                        <tr>
+                            {cols.map(c => <th key={c}>{c}</th>)}
                         </tr>
-                    ))}
-                </tbody>
-            </table>
+                    </thead>
+                    <tbody>
+                        {data.map((r, i) => (
+                            <tr key={i}>
+                                {cols.map(c => (
+                                    <td key={c}>{formatValue(r[c])}</td>
+                                ))}
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
         );
     };
 
@@ -213,7 +209,7 @@ function App() {
                 ref={el => chartRefs.current[index] = el}
                 style={{ height: 300, marginTop: 20 }}
             >
-                <ResponsiveContainer>
+                <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={data}>
                         <CartesianGrid strokeDasharray="3 3" />
                         <XAxis dataKey={catKey} />
@@ -231,17 +227,30 @@ function App() {
     };
 
     return (
-        <div style={{ display: "flex", flexDirection: "column", height: "100vh" }}>
+        <div style={{
+            display: "flex",
+            flexDirection: "column",
+            height: "100dvh"
+        }}>
 
             {/* HEADER */}
-            <div style={{ padding: 15, borderBottom: "1px solid #ddd" }}>
+            <div style={{
+                padding: 15,
+                borderBottom: "1px solid #ddd",
+                fontWeight: "bold"
+            }}>
                 🧠 Northwind AI Web Assistant
             </div>
 
             {/* CHAT */}
-            <div style={{ flex: 1, overflowY: "auto", padding: 20, background: "#f5f5f5" }}>
+            <div style={{
+                flex: 1,
+                overflowY: "auto",
+                padding: 15,
+                background: "#f5f5f5"
+            }}>
 
-                {/* SUGERENCIAS INICIALES */}
+                {/* 🔹 SUGERENCIAS INICIALES */}
                 {messages.length === 0 && (
                     <div style={{ textAlign: "center", marginTop: 50 }}>
                         <p style={{ color: "#666" }}>
@@ -288,9 +297,10 @@ function App() {
                                 <div style={{
                                     background: "#007bff",
                                     color: "white",
-                                    padding: 10,
-                                    borderRadius: 10,
-                                    display: "inline-block"
+                                    padding: 12,
+                                    borderRadius: 12,
+                                    display: "inline-block",
+                                    maxWidth: "80%"
                                 }}>
                                     {msg.text}
                                 </div>
@@ -302,13 +312,21 @@ function App() {
                                 <div style={{
                                     background: "white",
                                     padding: 15,
-                                    borderRadius: 10,
-                                    width: "80%"
+                                    borderRadius: 12,
+                                    width: "100%"
                                 }}>
 
-                                    <p><b>🧠 {msg.analysis}</b></p>
+                                    <p style={{ textAlign: "left" }}>
+                                        <b>🧠 {msg.analysis}</b>
+                                    </p>
 
-                                    <div style={{ marginBottom: 10 }}>
+                                    <div style={{
+                                        marginBottom: 10,
+                                        display: "flex",
+                                        justifyContent: "center",
+                                        gap: 10,
+                                        flexWrap: "wrap"
+                                    }}>
                                         <button onClick={() => exportToExcelPro(msg.rows)}>Excel</button>
                                         <button onClick={() => exportChartImage(i)}>Imagen</button>
                                         <button onClick={() => exportPDF(msg.rows, msg.analysis, i)}>PDF</button>
@@ -348,14 +366,40 @@ function App() {
             </div>
 
             {/* INPUT */}
-            <div style={{ display: "flex", padding: 10, borderTop: "1px solid #ddd" }}>
+            <div style={{
+                position: "sticky",
+                bottom: 0,
+                display: "flex",
+                padding: 10,
+                borderTop: "1px solid #ddd",
+                background: "white"
+            }}>
                 <input
-                    style={{ flex: 1 }}
-                    placeholder="Ej: top 5 customers o ventas por país"
+                    style={{
+                        flex: 1,
+                        padding: 12,
+                        fontSize: 16,
+                        borderRadius: 8,
+                        border: "1px solid #ccc"
+                    }}
+                    placeholder="Ej: top 5 customers"
                     value={question}
                     onChange={e => setQuestion(e.target.value)}
+                    onKeyDown={e => e.key === "Enter" && askDatabase()}
                 />
-                <button onClick={askDatabase}>Enviar</button>
+                <button
+                    onClick={askDatabase}
+                    style={{
+                        marginLeft: 10,
+                        padding: "12px 16px",
+                        borderRadius: 8,
+                        background: "#007bff",
+                        color: "white",
+                        border: "none"
+                    }}
+                >
+                    Enviar
+                </button>
             </div>
 
         </div>
