@@ -267,7 +267,7 @@ function App() {
                             {[
                                 "top 5 total ventas por categoría",
                                 "top 5 total ventas por producto",
-                                "top 5 total ventas por pais de envío",
+                                "top 5 total ventas por país de envío",
                                 "top 5 total ventas por país de cliente"
                             ].map((q, i) => (
                                 <button
